@@ -40,7 +40,7 @@ def minimize(cost_fun,cost_args,bounds,n_samp,n_chains=size):
 
     # Sample starting points: monte-carlo or latin hypercube
     if rank == 0:
-        all_samps = np.random.uniform(size=n_samp*n_dim).reshape([n_samp,n_dim])
+        all_samps = mc_samp(n_samp,n_dim)
         all_samps = bound_map(all_samps,bounds)
         sample_list = np.array_split(all_samps,size)
     else:
@@ -159,5 +159,46 @@ def grid_search(cost_fun,cost_args,sample_list):
 
     return cost_list
 
+def lhs(n_samp,n_dim):
+    ''' Latin Hypercube Sampler. Takes n_samp draws from n_dim space such that
+        each draw is in its own hyperplane.
 
+    Args:
+        n_samp (int): number of samples
+        n_dim (int): dimension of sample space
+
+    Returns:
+        all_samps (array): n_samp by n_dim array of LHS sample points
+    '''
+    # Width of hypercubes
+    dx = 1./n_samp
+
+    # Sample each dimension
+    all_samps = np.zeros([n_samp,n_dim])
+    for j in range(n_dim):
+
+        # Shuffle array of indices
+        tmp_arr = np.arange(n_samp)
+        np.random.shuffle(tmp_arr)
+
+        # Uniform draws in each hyperplane for dimension j
+        rand_arr = np.random.uniform(size=n_samp)
+
+        # Transform to [0,1] and store
+        all_samps[:,j] = dx*(tmp_arr + rand_arr)
+
+    return all_samps
+
+def mc_samp(n_samp,n_dim):
+    ''' Monte Carlo Sampler. Takes n_samp draws from n_dim space.
+
+    Args:
+        n_samp (int): number of samples
+        n_dim (int): dimension of sample space
+
+    Returns:
+        all_samps (array): n_samp by n_dim array of sample points
+    '''
+    all_samps = np.random.uniform(size=n_samp*n_dim).reshape([n_samp,n_dim])
+    return all_samps
 
