@@ -8,6 +8,7 @@ Stochastic Latin Hypercube or Monte Carlo sampler with amoeba (Nelder-Mead) sear
 
 ## Usage
 ```python
+# optimize_function.py
 import hyperamoeba.minimize as ha
 import numpy as np
 
@@ -28,4 +29,7 @@ args = [100.]                               # Rosenbrock args
 best_pt = ha.minimize(rosen,args,bounds,n_samp)
 if ha.rank == 0:
     print 'Best Point:',best_pt
+```
+```shell
+mpirun -np 2 python optimize_function.py
 ```
