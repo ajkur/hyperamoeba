@@ -34,7 +34,7 @@ def dhsimp(x_o,the_fun,fun_args,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,err_tol=1
         std_tol (float): stopping tolerance for standard deviation of the errors
         s_scale (float): scaling for starting simplex
         itmax (int): maximum number of iterations
-        verb (int): verbosity (0,1,2)
+        verb (int): verbosity (0/1/2)
 
     Returns:
         x_one (array): coordinates of best point
@@ -84,7 +84,7 @@ def dhsimp(x_o,the_fun,fun_args,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,err_tol=1
     
     # Begin simplex loop
     i_cur = 0
-    while np.sum(errs) > err_tol and np.std(errs) > std_tol and i_cur < itmax:
+    while np.min(errs) > err_tol and np.std(errs) > std_tol and i_cur < itmax:
         n1_loc = np.argmax(errs)
         one_loc = np.argmin(errs)
         x_n1 = verts[:,n1_loc]
@@ -163,7 +163,8 @@ def dhsimp(x_o,the_fun,fun_args,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,err_tol=1
     return x_one,min_err,i_cur,my_path
     
 if __name__ == '__main__':
-    ''' Testing simplex method
+    ''' Testing simplex method on a quadratic function
+        Minimum at [-5,7]
     '''
     cnt = 0
     def quad(x_o,(a,b)):
@@ -172,6 +173,6 @@ if __name__ == '__main__':
         return 1. + a*(x_o[0]+5)**2 + b*(x_o[1]-7)**2
     a = 1
     b = 1
-    x_o = np.zeros(2)#+500
+    x_o = np.zeros(2)
     x_one,min_err,i_cur,my_path = dhsimp(x_o,quad,(a,b),s_scale=10,verb=1)
     print 'Number of Model Calls:',cnt
