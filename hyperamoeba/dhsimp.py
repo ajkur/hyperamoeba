@@ -1,52 +1,43 @@
 from __future__ import division
 import numpy as np 
 
-# Calculate centroid
-def centCalc(xVec):
-    xC = np.zeros(xVec.shape[0])
-    for i in range(xVec.shape[0]):
-        for j in range(xVec.shape[1]):
-            xC[i] = xC[i] + xVec[i,j]
-    return xC/xVec.shape[1]
+def cent_calc(x_vec):
+    ''' Calculate centroid
 
-def boundWrap(var_arr,(og_wrap,obs_data,b_list),big_num=1e14):
-    '''Call boundTrans to translate to user supplied bounds
-       Return high error if out of bounds, otherwise return L2 norm
+    Args:
+
+    Kwargs:
+
+    Returns:
+
     '''
-    var_trans = boundTrans(var_arr,b_list)
-    bound_flag = False
-    for i in range(var_trans.shape[0]):
-        if var_trans[i] < b_list[i][0] or var_trans[i] > b_list[i][1]:
-            bound_flag = True
-            break
-    if bound_flag:
-        return big_num
-    else:
-        return np.sum((og_wrap(var_trans)-obs_data)**2)**0.5
+    x_o = np.zeros(x_vec.shape[0])
+    for i in range(x_vec.shape[0]):
+        for j in range(x_vec.shape[1]):
+            x_o[i] = x_o[i] + x_vec[i,j]
+    return x_o/x_vec.shape[1]
 
-def boundTrans(var_arr,b_list):
-    '''Translate point from [0,1] to user supplied bounds
+def dhsimp(x_o,the_fun,fun_args,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,err_tol=1e-8,std_tol=1e-8,s_scale=1,itmax=1000,verb=0):
+    ''' Downhill simplex (amoeba) method
+    
+    Args:
+
+    Kwargs:
+
+    Returns:
+
     '''
-    var_trans = np.zeros(var_arr.shape[0])
-    for i in range(var_arr.shape[0]):
-        var_trans[i] = var_arr[i]*(b_list[i][1] - b_list[i][0]) + b_list[i][0]
-    return var_trans
-
-# Downhill Simplex
-def dhSimp(x0,theFun,funArgs,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,tol=1e-8,sScale=1,prOut=True):
-    if prOut == True:
+    if verb > 0:
         print '\nStarting Downhill Simplex'
         print 'Sum of\tStd dev of\tIteration'
         print 'Errors\tErrors'
-    # Store path as a list
-    myPath = []
-    myPath.append(x0)
+    # Store path of the centroid as a list
+    my_path = []
+    my_path.append(x_o)
 
     # Get dimensions
-    N = x0.shape[0]
-
-    # Distance of each point form centroid
-    dist_arr = np.zeros(N)
+    x_o = x_o.flatten()
+    N = x_o.shape[0]
 
     # Set vertices of a regular simplex
     verts = np.zeros([N,N+1])
@@ -57,114 +48,113 @@ def dhSimp(x0,theFun,funArgs,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,tol=1e-8,sSc
     for i in range(N):
         verts[0,i+1] = -1.0/N
     for k in range(1,N):
-        vTemp = 0.0
+        v_temp = 0.0
         for j in range(0,k):
-            vTemp = vTemp + verts[j,k]**2
-        verts[k,k] = (1.0-vTemp)**0.5
+            v_temp = v_temp + verts[j,k]**2
+        verts[k,k] = (1.0-v_temp)**0.5
         for i in range(k+1,N+1):
-            vTemp = 0.0
+            v_temp = 0.0
             for l in range(0,k):
-                vTemp = vTemp + verts[l,k]*verts[l,i]
-            verts[k,i] = (-1.0/N - vTemp)/verts[k,k]
+                v_temp = v_temp + verts[l,k]*verts[l,i]
+            verts[k,i] = (-1.0/N - v_temp)/verts[k,k]
 
     # Scale and shift simplex to specified starting centroid 
     for i in range(N):
         for j in range(N+1):
-            verts[i,j] = verts[i,j]*sScale + x0[i]
+            verts[i,j] = verts[i,j]*s_scale + x_o[i]
 
     # Calculate erros at each vertex
     for i in range(N+1):
-        errs[i] = theFun(verts[:,i],funArgs)
+        errs[i] = the_fun(verts[:,i],fun_args)
+    
+    # Begin simplex loop
+    i_cur = 0
+    while np.sum(errs) > err_tol and np.std(errs) > std_tol and i_cur < itmax:
+        n1_loc = np.argmax(errs)
+        one_loc = np.argmin(errs)
+        x_n1 = verts[:,n1_loc]
+        x_one = verts[:,one_loc]
+        if i_cur%2 == 0 and verb > 0:
+            print str(np.sum(errs))+'\t'+str(np.std(errs))+'\t'+str(i_cur)
 
-    # print verts,np.exp(verts)
-    iCur = 0
-    while np.sum(errs) > tol and np.std(errs) > tol and iCur < 1000:
-        N1Loc = np.argmax(errs)
-        OneLoc = np.argmin(errs)
-        xN1 = verts[:,N1Loc]
-        xOne = verts[:,OneLoc]
-        if iCur%2 == 0 and prOut == True:
-            print str(np.sum(errs))+'\t'+str(np.std(errs))+'\t'+str(iCur)
         # Cut out max error
         j = 0
         for i in range(N+1):
-            if i != N1Loc:
+            if i != n1_loc:
                 verts1[:,j] = verts[:,i]
                 errs1[j] = errs[i]
                 j += 1
 
-        secLoc = np.argmax(errs1)
-        xN = verts1[:,secLoc]
+        # Get index of second highest error
+        sec_loc = np.argmax(errs1)
 
         # Calculate new centroid
-        x0 = centCalc(verts1)
-        myPath.append(x0)
+        x_o = cent_calc(verts1)
+        my_path.append(x_o)
 
         # Reflection
-        xR = x0 + alpha*(x0 - xN1)
-        errR = theFun(xR,funArgs)
-        if errR < errs1[secLoc] and errR > errs[OneLoc]:
-            # print 'Reflection'
-            verts[:,N1Loc] = 1.0*xR
-            errs[N1Loc] = 1.0*errR
+        x_r = x_o + alpha*(x_o - x_n1)
+        err_r = the_fun(x_r,fun_args)
+        if err_r < errs1[sec_loc] and err_r > errs[one_loc]:
+            if verb > 1:
+                print 'Reflection'
+            verts[:,n1_loc] = 1.0*x_r
+            errs[n1_loc] = 1.0*err_r
 
         # Expansion
-        elif errR < errs[OneLoc]:
-            # print 'Expansion'
-            xE = x0 + gamma*(x0 - xN1)
-            errE = theFun(xE,funArgs)
-            if errE < errR:
-                verts[:,N1Loc] = 1.0*xE
-                errs[N1Loc] = 1.0*errE
+        elif err_r < errs[one_loc]:
+            if verb > 1:
+                print 'Expansion'
+            x_e = x_o + gamma*(x_o - x_n1)
+            err_e = the_fun(x_e,fun_args)
+            if err_e < err_r:
+                verts[:,n1_loc] = 1.0*x_e
+                errs[n1_loc] = 1.0*err_e
             else:
-                verts[:,N1Loc] = 1.0*xR
-                errs[N1Loc] = 1.0*errR
+                verts[:,n1_loc] = 1.0*x_r
+                errs[n1_loc] = 1.0*err_r
 
-        # Contraction
         else:
-            xC = x0 + rho*(x0 - xN1)
-            errC = theFun(xC,funArgs)
-            if errC < errs[N1Loc]:
-                verts[:,N1Loc] = 1.0*xC
-                errs[N1Loc] = 1.0*errC
-                # print 'Contraction'
+            # Contraction
+            x_c = x_o + rho*(x_o - x_n1)
+            err_c = the_fun(x_c,fun_args)
+            if err_c < errs[n1_loc]:
+                verts[:,n1_loc] = 1.0*x_c
+                errs[n1_loc] = 1.0*err_c
+                if verb > 1:
+                    print 'Contraction'
             else:
                 # Reduction
-                # print 'Reduction'
+                if verb > 1:
+                    print 'Reduction'
                 for ll in range(N+1):
-                    if ll != OneLoc:
-                        verts[:,ll] = xOne + sigma*(verts[:,ll] - xOne)
-                        errs[ll] = theFun(verts[:,ll],funArgs)
+                    if ll != one_loc:
+                        verts[:,ll] = x_one + sigma*(verts[:,ll] - x_one)
+                        errs[ll] = the_fun(verts[:,ll],fun_args)
 
-        # Calculate centroid and check spread of points
-        x0 = centCalc(verts)
-        for i in range(N):
-            dist_arr[i] = np.sum((x0 - verts[:,i])**2)**0.5
-        if np.max(dist_arr) < tol:
-            break
-
-        iCur += 1
+        # Increment iteration counter
+        i_cur += 1
 
     # Get the best vertex
-    OneLoc = np.argmin(errs)
-    xOne = verts[:,OneLoc]
-    if prOut == True:
-	print verts
-        print '\nComplete\n# of iterations:',iCur
-        print 'Error at best point:',np.min(errs)
-        print 'Best Point:',xOne
-    return iCur,myPath,xOne
-
+    one_loc = np.argmin(errs)
+    x_one = verts[:,one_loc]
+    min_err = np.min(errs)
+    if verb > 0:
+        print '\nComplete\n# of iterations:',i_cur
+        print 'Error at best point:',min_err
+        print 'Best Point:',x_one
+    return x_one,min_err,i_cur,my_path
+    
 if __name__ == '__main__':
     cnt = 0
-    def quad(x0,(a,b)):
+    def quad(x_o,(a,b)):
         global cnt
         cnt += 1
-        return 1. + a*(x0[0]+5)**2 + b*(x0[1]-7)**2
+        return 1. + a*(x_o[0]+5)**2 + b*(x_o[1]-7)**2
 
     a = 1
     b = 1
-    x0 = np.zeros(2)#+500
-    iCur,myPath,x0 = dhSimp(x0,quad,(a,b),sScale=10,prOut=False)
+    x_o = np.zeros(2)#+500
+    i_cur,my_path,x_o = dhsimp(x_o,quad,(a,b),s_scale=10,verb=1)
     print 'Number of Model Calls:',cnt
-    print 'Best Point:',x0
+    print 'Best Point:',x_o

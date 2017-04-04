@@ -17,7 +17,7 @@ rank = comm.Get_rank()
 name = MPI.Get_processor_name()
 
 def minimize(cost_fun,bounds,n_samp,n_chains=size):
-    '''Minimize a function with the hypercube amoeba search
+    ''' Minimize a function with the hypercube amoeba search
 
     Args:
         Function to optimize
@@ -54,25 +54,40 @@ def minimize(cost_fun,bounds,n_samp,n_chains=size):
 
         # Recombine error pairs
         cost_arr = np.concatenate(cost_list)
-        for i in range(n_samp):
-            print all_samps[i,:],cost_arr[i]
+        # for i in range(n_samp):
+        #     print all_samps[i,:],cost_arr[i]
 
         # Get n_chains best sample points
         chain_inds = cost_arr.argsort()[:n_chains]
-        print chain_inds
-        print all_samps[chain_inds,:]
+        # print chain_inds
+        chain_pts = all_samps[chain_inds,:]
+        chain_pts_list = np.array_split(chain_pts,n_chains)
+    else:
+        chain_pts_list = []
 
     # Run simplex at each point (MPI)
+    # Scatter input arrays
+    my_ins = comm.scatter(chain_pts_list,root=0)
 
+    # Run simplex on own input set
+    my_ins = bound_map(my_ins,bounds,to_og=False)
+    x_one,min_err,i_cur,my_path = dhsimp.dhsimp(my_ins,bound_wrap,(cost_fun,bounds),s_scale=0.1,verb=0)
+
+    # Gather best points and errors
+    pt_list = comm.gather(x_one,root=0)
+    err_list = comm.gather(min_err,root=0)
+        
     # Return best point
-
     if rank == 0:
-        return 4
+        print pt_list
+        print err_list
+        print pt_list[np.argmin(err_list)]
+        return pt_list[np.argmin(err_list)]
     else:
         return None
 
-def bound_map(all_samps,bounds,to_og=True):
-    '''Map bounds from [0,1] to original coordinates and back
+def bound_map(sample_arr,bounds,to_og=True):
+    ''' Map bounds from [0,1] to original coordinates and back
 
     Args:
 
@@ -81,18 +96,52 @@ def bound_map(all_samps,bounds,to_og=True):
     Returns:
 
     '''
-    if to_og:
-        for i in range(all_samps.shape[0]):
-            for j in range(all_samps.shape[1]):
-                all_samps[i,j] = bounds[j,0] + all_samps[i,j]*(bounds[j,1] - bounds[j,0])
+    # Transform array
+    sample_trans = np.zeros(sample_arr.shape)
+
+    # Check dimension of sample array and perform transform
+    if sample_arr.ndim == 1:
+        if to_og:
+            for j in range(bounds.shape[0]):
+                sample_trans[j] = bounds[j,0] + sample_arr[j]*(bounds[j,1] - bounds[j,0])
+        else:
+            for j in range(bounds.shape[0]):
+                sample_trans[j] = (sample_arr[j] - bounds[j,0])/(bounds[j,1] - bounds[j,0])
+    elif sample_arr.ndim == 2:
+        if to_og:
+            for i in range(sample_arr.shape[0]):
+                for j in range(sample_arr.shape[1]):
+                    sample_trans[i,j] = bounds[j,0] + sample_arr[i,j]*(bounds[j,1] - bounds[j,0])
+        else:
+            for i in range(sample_arr.shape[0]):
+                for j in range(sample_arr.shape[1]):
+                    sample_trans[i,j] = (sample_arr[i,j] - bounds[j,0])/(bounds[j,1] - bounds[j,0])
+    return sample_trans
+
+def bound_wrap(x_p,(cost_fun,bounds),big_num=1e14):
+    ''' Call bound_map to translate to user supplied bounds.
+        Return large error if out of bounds, otherwise return the cost function evaluation.
+
+    Args:
+
+    Kwargs:
+
+    Returns:
+
+    '''
+    bound_flag = False
+    for i in range(x_p.shape[0]):
+        if x_p[i] <= 0. or x_p[i] >= 1.:
+            bound_flag = True
+            break
+    if bound_flag:
+        return big_num
     else:
-        for i in range(all_samps.shape[0]):
-            for j in range(all_samps.shape[1]):
-                all_samps[i,j] = (all_samps[i,j] - bounds[j,0])/(bounds[j,1] - bounds[j,0])
-    return all_samps
+        x_p_og = bound_map(x_p,bounds)
+        return cost_fun(x_p)
 
 def grid_search(cost_fun,sample_list):
-    '''Evaluate cost function at each sample point
+    ''' Evaluate cost function at each sample point
 
     Args:
 
@@ -104,7 +153,7 @@ def grid_search(cost_fun,sample_list):
     # Scatter input arrays
     my_ins = comm.scatter(sample_list,root=0)
 
-    # Do work on personal input set
+    # Evaluate cost function of own input set
     my_cost = np.zeros(my_ins.shape[0])
     for i in range(my_ins.shape[0]):
         my_cost[i] = cost_fun(my_ins[i,:])
