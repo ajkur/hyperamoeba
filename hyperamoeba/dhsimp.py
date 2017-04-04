@@ -5,27 +5,42 @@ def cent_calc(x_vec):
     ''' Calculate centroid
 
     Args:
-
-    Kwargs:
+        x_vec (array): 2d array of vertices
 
     Returns:
-
+        x_o (array): coordinates of centroid
     '''
     x_o = np.zeros(x_vec.shape[0])
     for i in range(x_vec.shape[0]):
         for j in range(x_vec.shape[1]):
             x_o[i] = x_o[i] + x_vec[i,j]
-    return x_o/x_vec.shape[1]
+    x_o = x_o/x_vec.shape[1]
+    return x_o
 
 def dhsimp(x_o,the_fun,fun_args,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,err_tol=1e-8,std_tol=1e-8,s_scale=1,itmax=1000,verb=0):
     ''' Downhill simplex (amoeba) method
     
     Args:
+        x_o (array): starting point
+        the_fun (function): function to be minimized
+        fun_args (tuple): tuple of arguments to pass to the function
 
     Kwargs:
+        alpha (float): reflection coefficient
+        gamma (float): expansion coefficient
+        rho (float): contraction coefficient
+        sigma (float): reduction coefficient
+        err_tol (float): cost function error stopping tolerance
+        std_tol (float): stopping tolerance for standard deviation of the errors
+        s_scale (float): scaling for starting simplex
+        itmax (int): maximum number of iterations
+        verb (int): verbosity (0,1,2)
 
     Returns:
-
+        x_one (array): coordinates of best point
+        min_err (array): error at best point
+        i_cur (array): number of simplex iterations
+        my_path (list): list of centroid locations at each iteration
     '''
     if verb > 0:
         print '\nStarting Downhill Simplex'
@@ -74,6 +89,8 @@ def dhsimp(x_o,the_fun,fun_args,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,err_tol=1
         one_loc = np.argmin(errs)
         x_n1 = verts[:,n1_loc]
         x_one = verts[:,one_loc]
+
+        # Print progress
         if i_cur%2 == 0 and verb > 0:
             print str(np.sum(errs))+'\t'+str(np.std(errs))+'\t'+str(i_cur)
 
@@ -146,15 +163,15 @@ def dhsimp(x_o,the_fun,fun_args,alpha=1.0,gamma=2.0,rho=-0.5,sigma=0.5,err_tol=1
     return x_one,min_err,i_cur,my_path
     
 if __name__ == '__main__':
+    ''' Testing simplex method
+    '''
     cnt = 0
     def quad(x_o,(a,b)):
         global cnt
         cnt += 1
         return 1. + a*(x_o[0]+5)**2 + b*(x_o[1]-7)**2
-
     a = 1
     b = 1
     x_o = np.zeros(2)#+500
-    i_cur,my_path,x_o = dhsimp(x_o,quad,(a,b),s_scale=10,verb=1)
+    x_one,min_err,i_cur,my_path = dhsimp(x_o,quad,(a,b),s_scale=10,verb=1)
     print 'Number of Model Calls:',cnt
-    print 'Best Point:',x_o
