@@ -30,6 +30,6 @@ best_pt = ha.minimize(rosen,args,bounds,n_samp)
 if ha.rank == 0:
     print 'Best Point:',best_pt
 ```
-```shell
-mpirun -np 2 python optimize_function.py
+```bash
+$ mpirun -np 2 python optimize_function.py
 ```
