@@ -16,7 +16,7 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 name = MPI.Get_processor_name()
 
-def minimize(cost_fun,bounds,n_samp,n_chains=size):
+def minimize(cost_fun,cost_args,bounds,n_samp,n_chains=size):
     ''' Minimize a function with the hypercube amoeba search
 
     Args:
@@ -47,19 +47,16 @@ def minimize(cost_fun,bounds,n_samp,n_chains=size):
         sample_list = []
 
     # Run function at each starting point (MPI)
-    cost_list = grid_search(cost_fun,sample_list)
+    cost_list = grid_search(cost_fun,cost_args,sample_list)
 
     # Process grid search results
     if rank == 0:
 
         # Recombine error pairs
         cost_arr = np.concatenate(cost_list)
-        # for i in range(n_samp):
-        #     print all_samps[i,:],cost_arr[i]
 
         # Get n_chains best sample points
         chain_inds = cost_arr.argsort()[:n_chains]
-        # print chain_inds
         chain_pts = all_samps[chain_inds,:]
         chain_pts_list = np.array_split(chain_pts,n_chains)
     else:
@@ -71,7 +68,7 @@ def minimize(cost_fun,bounds,n_samp,n_chains=size):
 
     # Run simplex on own input set
     my_ins = bound_map(my_ins,bounds,to_og=False)
-    x_one,min_err,i_cur,my_path = dhsimp.dhsimp(my_ins,bound_wrap,(cost_fun,bounds),s_scale=0.1,verb=0)
+    x_one,min_err,i_cur,my_path = dhsimp.dhsimp(my_ins,bound_wrap,(cost_fun,cost_args,bounds),s_scale=0.1,verb=0)
 
     # Gather best points and errors
     pt_list = comm.gather(x_one,root=0)
@@ -118,9 +115,8 @@ def bound_map(sample_arr,bounds,to_og=True):
                     sample_trans[i,j] = (sample_arr[i,j] - bounds[j,0])/(bounds[j,1] - bounds[j,0])
     return sample_trans
 
-def bound_wrap(x_p,(cost_fun,bounds),big_num=1e14):
-    ''' Call bound_map to translate to user supplied bounds.
-        Return large error if out of bounds, otherwise return the cost function evaluation.
+def bound_wrap(x_p,(cost_fun,cost_args,bounds),big_num=1e14):
+    ''' Return large error if out of bounds, otherwise return the cost function evaluation.
 
     Args:
 
@@ -138,9 +134,9 @@ def bound_wrap(x_p,(cost_fun,bounds),big_num=1e14):
         return big_num
     else:
         x_p_og = bound_map(x_p,bounds)
-        return cost_fun(x_p)
+        return cost_fun(x_p,*cost_args)
 
-def grid_search(cost_fun,sample_list):
+def grid_search(cost_fun,cost_args,sample_list):
     ''' Evaluate cost function at each sample point
 
     Args:
@@ -156,7 +152,7 @@ def grid_search(cost_fun,sample_list):
     # Evaluate cost function of own input set
     my_cost = np.zeros(my_ins.shape[0])
     for i in range(my_ins.shape[0]):
-        my_cost[i] = cost_fun(my_ins[i,:])
+        my_cost[i] = cost_fun(my_ins[i,:],*cost_args)
 
     # Gather outputs
     cost_list = comm.gather(my_cost,root=0)
