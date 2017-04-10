@@ -30,7 +30,9 @@ def minimize(cost_fun,cost_args,bounds,n_samp,sampler='mc',n_chains=size,verb=0)
         n_chains (int): number of simplex chains (default size of the MPI communicator)
         verb (int): verbosity level (0/1/2)
 
-    Need to add:
+    To-do:
+        Clean up number of print statements in verbose modes
+        Make a smoother boundary transition
         Stopping tolerance for the simplex algorithm (both standard dev and minimum error of simplex verticies)
         Chain proximity tolerance (check against stopped chains as well as those currently running)
         Simplex chains pull from a stack of starting points
