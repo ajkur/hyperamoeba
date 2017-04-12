@@ -36,6 +36,7 @@ def minimize(cost_fun,cost_args,bounds,n_samp,sampler='mc',n_chains=size,verb=0)
         Stopping tolerance for the simplex algorithm (both standard dev and minimum error of simplex verticies)
         Chain proximity tolerance (check against stopped chains as well as those currently running)
         Simplex chains pull from a stack of starting points
+        Pass simplex error tolerances up to minimize
 
     Returns:
         best_pt (array): location of best point returned by root processor
